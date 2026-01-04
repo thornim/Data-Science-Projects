@@ -1,0 +1,224 @@
+---
+title: "Projet 3 - Greffes d'organes"
+author: "tasnim"
+date: "2025-11-29"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+***L'objectif de l'étude est de déterminer si le nombre de jours pendant lesquels un patient a survécu était influencé par l'organe affecté. Nous disposons d'un jeu de données (dataframe) présentant 2 types de variables: variable dépendante (survie mesurée en jours) et variable indépendante (organes avec estomac, côlon, ovaires, poumons et seins)***
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(rstatix)
+library(ggpubr)
+library(knitr)
+library(sjstats)
+
+setwd("/Users/tasnim/Desktop/M1-InfoMed/R")
+organ <- read.csv("organs.csv", sep=",")
+```
+
+
+```{r}
+# Structure globale du dataframe
+str(organ)
+```
+
+### 1) Créer des récapitulatifs statistiques pour chaque organe (mean, median, quartiles...)
+
+```{r}
+by(organ$Survival, organ$Organ, summary)
+```
+
+```{r}
+tab <- organ %>%
+  group_by(Organ)%>%
+  summarise(summary=list(summary(Survival)))%>%
+  tidyr::unnest_wider(summary)
+knitr::kable(tab, caption = "Tableau récapitulatif de la survie pour chaque organe", digits =2)
+```
+
+### 2) Vérifier la présence de valeurs extrêmes avec des boxplots :
+
+```{r}
+# Boxplots avec couleurs par organe :
+boxplot(Survival~Organ,data = organ, col = c('red', 'orange','green','blue','purple' ), 
+main = "Survie par organe", ylab='Jours de survie', range=1)
+```
+
+```{r}
+outliers <- organ %>%
+  group_by(Organ)%>%
+  identify_outliers(Survival)
+knitr::kable(outliers, caption = "Valeurs extrêmes", digits =2)
+
+```
+
+Dans le dataframe organ, il y a la présence d'outliers. Certains patients ont survécu beaucoup plus longtemps (ou moins) que la majorité de leur groupe. Ces valeurs extrêmes vont à l'encontre de l'hypothèse de normalité nécessaire pour l'ANOVA. Il s'agit donc d'une distribution asymétrique des temps de survie. Besoin de transformer en log().
+
+### 3) Vérifier la normalité et l'égalité des variances :
+
+
+
+  + Indépendance des observations : 
+
+Chaque sujet doit appartenir à un seul groupe. Il n y a pas de relation entre les observations dans chaque groupe. Il n'est pas permis d'avoir des mesures répétées pour les mêmes participants.
+
+  + Normalité :
+
+Les données de chaque groupe doivent être distribuées à peu près normalement.
+
+```{r}
+qqnorm(organ$Survival,pch=19, main = 'Distribution anormale des organes'); 
+qqline(organ$Survival)
+```
+
+```{r}
+# Analyse des résidus ANOVA :
+model <- lm(Survival ~ Organ, data= organ)
+ggqqplot(residuals(model))
+```
+
+```{r}
+
+shap<- shapiro_test(organ$Survival)
+print(shap)
+
+
+```
+
+```{r}
+# Vérifier la normalité de chaque groupe séparément :
+shapiro.test(organ$Survival[organ$Organ == 'Stomach'])
+shapiro.test(organ$Survival[organ$Organ == 'Breast'])
+shapiro.test(organ$Survival[organ$Organ == 'Ovary'])
+shapiro.test(organ$Survival[organ$Organ == 'Bronchus'])
+shapiro.test(organ$Survival[organ$Organ == 'Colon'])
+```
+Seulement la p-value de 'Breast' est supérieure à 0.05. Pour les autres, on rejette H0 et la distribution n'est pas normale.
+
+```{r}
+ggqqplot(organ, "Survival", facet.by="Organ", color='Organ')
+```
+
+Hypothèse nulle H0 est rejetée : Les résidus ne suivent pas une loi normale. 
+Si p-value > 0.05, on ne rejette pas H0, les résidus sont compatibles avec la normalité et l'ANOVA est utilisable. Dans le cas contraire, où, p-value < 0.05, on rejette H0, les résidus s'écartent significativement de la normalité et l'ANOVA est peu fiable (risque sur les p-values).
+
+Ici, il semblerait que le test de Shapiro rejette H0 (sauf pour 'Breast'), mais les ggqqplot semblent valider une normalité apparente.
+
+Le test d'ANOVA semble difficile à effectuer actuellement.
+
+
+  + Homogénéité de la variance :
+
+```{r}
+plot(model, 1)
+```
+
+Les points ne sont pas disposés de façon 'nuagée' homogène autour du 0. Il y a la présence de cônes qui sont les résidus de plus en plus dispersés quand la moyenne augmente. Les variances ne sont donc pas homogènes et on peut qualifier cela d'hétéroscédasticité.
+
+### 4) Transformer les données (log(Survival)) et revérifier la normalité et l'égalité des variances :
+
+```{r}
+organ$log_Survival <- log(organ$Survival)
+```
+
+  + Valeurs extrêmes :
+  
+```{r}
+outliers_log <- organ %>% 
+  group_by(Organ) %>%
+  identify_outliers(log_Survival)
+knitr::kable(outliers_log, caption = "Valeurs extrêmes", digits =2)
+```
+
+  + Normalité :
+
+```{r}
+
+qqnorm(organ$log_Survival, main = 'Normal Q-Q Plot');
+qqline(organ$log_Survival)
+
+```
+
+La normalité est validée.
+
+```{r}
+# Analyse des résidus ANOVA :
+modela<-lm(log_Survival ~Organ, data=organ)
+ggqqplot(residuals(modela), main ="Analyse de normalité")
+```
+
+```{r}
+shapiro_test(organ$log_Survival)
+```
+
+```{r}
+# Vérifier la normalité de chaque groupe séparément :
+shapiro.test(organ$log_Survival[organ$Organ == 'Stomach'])
+shapiro.test(organ$log_Survival[organ$Organ == 'Breast'])
+shapiro.test(organ$log_Survival[organ$Organ == 'Ovary'])
+shapiro.test(organ$log_Survival[organ$Organ == 'Bronchus'])
+shapiro.test(organ$log_Survival[organ$Organ == 'Colon'])
+```
+Seulement la p-value de 'Breast' est inférieur à 0.05. Pour les autres, on conserve H0 et la distribution est normale.
+
+```{r}
+ggqqplot(organ, "log_Survival", facet.by="Organ", color='Organ')
+```
+
+  + Homogénéité de la variance :
+  
+```{r}
+plot(modela,1)
+```
+Les points sont dispersés de façon 'nuagée' homogène autour du 0. Il n y a pas la formation de cônes. Les variances sont à peu près constantes. On peut parler d'homoscedasticité raisonnable.
+
+### 5) Exécuter le test d'ANOVA suivi du test post-hoc de Tukey :
+
+```{r}
+anova_log <- aov(log_Survival ~Organ, data=organ)
+summary(anova_log)
+```
+Ici, la p-value est inférieure à 0.05. On rejette H0, les différences sont significatives entre au moins 2 organes et les moyennes de survie ne sont toutes pas égales.
+
+```{r}
+# Calculer la taille de l'effet :
+effectsize::eta_squared(anova_log)
+```
+23 % de la variabilité en survie est expliquée par l'organe. La taille de l'effet est très importante et suggère que le type d'organe explique une part de la variabilité observée en survie.
+
+```{r}
+Tuk <- TukeyHSD(anova_log, conf.level = 0.95)
+Tuk
+```
+Ici, la survie médiane des patients à qui a été greffé une bronche est significativement plus élevée que celle du groupe greffé d'un sein.
+De même, pour la survie médiane des patients greffés d'un estomac qui est sognificativement supérieure à celle des patients greffés d'un sein.
+
+
+
+Cela est également visible sur le plot ci-dessous. Si l'intervalle croise zéro, cela n'est pas significatif.
+```{r}
+par (mar=c(5,12,4,2))
+plot(Tuk, las=1)
+```
+
+
+***D'après notre étude, le nombre de jours pendant lesquels un patient a survécu est bien influencé par l'organe affecté.***
+
+
+
+
+
+
+
+
+
+
+
+
+
