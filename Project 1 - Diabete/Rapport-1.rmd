@@ -1,0 +1,175 @@
+---
+title: "Rapport_Diabète"
+author: "tasnim"
+date: "2025-10-09"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Mini-Projet (1) - Glycémie de patients diabétiques soumis à 2 régimes alimentaires différents
+====================
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+***Une nutritionniste souhaite comparer deux régimes différents, A et B, pour des patients diabétiques.
+Dans une population de patients diabétiques, elle a échantillonné aléatoirement 100 patients qui suivront le régime A (groupe 1) et 100 patients qui suivront le régime B (groupe 2). À la fin de l'expérience, qui dure 6 semaines, un test de glycémie à jeun est réalisé sur chaque patient.***
+
+***Description des données***
+-------------------------------------
+
+
+
++ *Quelle est la glycémie moyenne de chaque groupe ?* 
+
+```{r}
+setwd("/Users/tasnim/Desktop/M1 InfoMed/Mini-projets(R)/(1)")
+diabete <- read.table("diabete.txt")
+summary(diabete)
+```
+Les moyennes des groupes 1 et 2 sont respectivement 1.0525 g/L et 1.098 g/L.
+
+
+
+
++ *Quel est l'écart-type de la distribution de la glycémie pour le régime A et pour le régime B ?*
+```{r}
+library(prettyR)
+describe(diabete, num.desc=c("sd"))
+```
+Nous allons essayer de représenter graphiquement la distribution de chaque régime permettant de visualiser la médiane.
+
++ *Pour ce faire, nous allons réaliser une boîte à moustache - boxplot :*
+```{r}
+par(mfrow=c(1,2))
+boxplot (diabete$groupe1, range = 0,col="orange", ylab="taux de glyécmie en g/L", xlab="groupe de patients suivant le régime 1", main="boîtes à moustaches groupe 1")
+boxplot(diabete$groupe1, range=0, col="green",ylab="taux de glycémie en g/L", xlab="groupe de patients suivant le régime 2",main="boîte à moustaches groupe 2")
+```
+
+
+***Analyses statistiques***
+----------------------------
++ *Quelle est la différence moyenne de glycémie entre les deux régimes ?*
+
+```{r difference}
+diff <- round(mean(diabete$groupe2)- mean(diabete$groupe1),2)
+diff
+```
+La différence moyenne des 2 groupes est de `r diff` g/L
+
+
+
+
+
+**Pour vérifier si la distribution d'une variable est normale, nous pouvons réaliser un histogramme/qqplot. De plus le nombre de cas (n) doit être supèrieure à 30 et les variances égales (sinon test de Welch).**
+**Pour vérifier cela, nous avons tracé des graphiques pour vérifier la normalité. En utilisant la commande suivante :**
+```{r}
+par(mfrow=c(1,2))
+qqnorm(diabete$groupe1,col="orange",main="groupe1");qqline(diabete$groupe1)
+qqnorm(diabete$groupe2,col="green",main="groupe2");qqline(diabete$groupe2)
+```
+
+
+
+
+
+
+Avant de réaliser et de choisir notre test statistique, nous allons nous assurer que les variances sont égales. Ils s'agit de l'une des conditions les plus importantes à vérifier.
+
+```{r}
+var.test(diabete$groupe1,diabete$groupe2)
+```
+Les variances ne sont pas égales car la 'p-value' est supérieure à 0.05.
+
+
+
+
+
+
+***Dès lors, nous allons effectuer le test de Welch car les variables suivent une loi normale mais les variances sont inégales :***
+
+```{r}
+t.test(diabete$groupe1, diabete$groupe2,var.equal=FALSE)
+```
+Ainsi, nous rendons compte que les moyennes sont significativement différentes dans les 2 groupes. En effet, la 'p-value',ici, est inferieure à 2.485e-06.
+
+***Taille de l'échantillon***
+---------------------------------
+*Nous allons essayer maintenant de faire tous ces tests sur un groupe de 10 patients choisis aléatoirement (groupe1b et groupe2b).
+Tout d'abord, il faut échantillonner aléatoiremment 10 patients de chaque groupe et pour ce faire nous utilisons ces commandes :*
+
+```{r}
+set.seed(1)
+groupe1b <- sample(diabete$groupe1, 10, replace = TRUE)
+groupe2b <- sample (diabete$groupe2, 10, replace=TRUE)
+
+```
+
++ *Glycémie moyenne de chaque groupe (groupe1b et groupe 2b) :*
+
+```{r}
+mean(groupe1b)
+mean(groupe2b)
+```
+
+
++ *Écart-type de la distribution de la glycémie pour le régime A (groupe1b) et pour le régime B (groupe2b) :*
+
+```{r}
+sd(groupe1b)
+sd(groupe2b)
+```
+
+
++ *Représentation de la distribution de la glycémie de chaque régime sous la forme d'un graphique permettant de visualiser la médiane et les quartiles :*
+
+
+```{r}
+par(mfrow=c(1,2))
+boxplot (groupe1b,range=0,col="orange",ylab="taux de glyécmie en g/L", xlab="échantillon de patients suivant le régime 1", main="boîtes à moustaches groupe 1b")
+boxplot(groupe2b, range = 0, col="lightgreen",ylab="taux de glyécmie en g/L", xlab="échantillon de patients suivant le régime 2", main="boîtes à moustaches groupe 2b")
+```
+
+
++ *Différence de moyennes de glycémie entre les 2 régimes :*
+```{r}
+var.test(groupe1b,groupe2b)
+```
+
+
+
+```{r}
+par(mfrow=c(1,2))
+qqnorm(groupe1b,col="orange", main="groupe1b");qqline(groupe1b)
+qqnorm(groupe2b,col="lightgreen",main="groupe2b");qqline(groupe2b)
+```
+
+
+```{r}
+var.test(groupe1b,groupe2b)
+```
+Nous remarquons que la 'p-value' = 0.05906. Cette valeur est supérieure à la 'p-value' précédente (<2.485e-06). Nous pouvons donc dire que cette différence n'est pas significative.
+
+***Test de Wilcoxon :***
+La taille de l'échantillon étant trop petite, nous ne pouvons pas utiliser le test de Welch, nous allons donc utiliser le test de Wilcoxon même si ce test compare les rangs plutôt que les moyennes. Nous utilisons ce test car l'échantillon est tellement petit que comparer les moyennes serait impossible.
+```{r}
+wilcox.test(groupe1b,groupe2b)
+```
+La p-value étant supérieure à 0.05, les moyennes sont donc égales.
+
++ *Quelle différence pouvons nous noter entre chaques résultats pour des groupes de 10 ou 100 patients ?*
+
+La principale différence entre des groupes de 100 patients et de 10 patients concerne la fiabilité et la précision des résultats : les estimations issues d’un plus grand échantillon sont généralement plus stables, avec une variance plus faible et une marge d’erreur réduite. En effet, la p-value est signicative dans les groupes de 100 patients par comparaison aux groupes 1b et 2b (ayant seulement 10 patients). De ce fait, les groupes plus grands sont plus fiables pour des études statistiques. De plus, l'étendue de l'intervalle de confiance augmente si le nombre d'échantillons diminue.
+
+
+
+
+
+
+
+
+
+
