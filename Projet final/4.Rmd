@@ -1,0 +1,581 @@
+---
+title: "VIH-death-rates"
+author: "poussyina & tasnim"
+date: "2025-12-03"
+output:
+  pdf_document: default
+  html_document: default
+  
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(rstatix)
+library(ggpubr)
+library(knitr)
+library(sjstats)
+library(ggrepel)
+setwd("/Users/tasnim/Desktop/M1-InfoMed/R")
+vih <- read.csv("hiv-death-rates.csv", sep=",")
+```
+
+# 1. Introduction :
+
+L’infection par le virus de l’immunodéficience humaine (VIH) demeure un enjeu majeur de santé publique mondiale, malgré les progrès thérapeutiques réalisés depuis les années 1990. Depuis l'identification du virus en 1983, l'épidémie a connu des évolutions contrastées selon les régions. L'introduction des trithérapies antirétrovirales (HAART) en 1996 a marqué un tournant décisif, transformant le VIH d'une maladie mortelle en une infection chronique gérable dans les pays ayant un accès précoce aux traitements.
+
+Entre 1990 et 2017, la mortalité liée au VIH a connu une forte hétérogénéité selon les pays et les régions, reflétant à la fois l’inégalité d’accès aux traitements antirétroviraux et la diversité des réponses de santé publique.
+
+Notre étude analyse l’évolution temporelle des taux de mortalité liés au VIH entre 1990 et 2017, en comparant 5 pays représentatifs (France, Japon, Russie, États-Unis, Afrique du Sud) ainsi que de grandes régions mondiales. L’objectif est d’évaluer dans quelle mesure le déclin global observé traduit l’efficacité des politiques de prévention et de prise en charge, tout en mettant en évidence les disparités géographiques persistantes.
+
+***Dans quelles mesures les politiques de santé publique ont-elles réduit la mortalité liée au VIH entre 1990 et 2017, et quelles disparités géographiques persistent ?***
+
+# 2. Matériel et méthodes :
+
+## 2.1 Données :
+Nous disposons d’un jeu de données décrivant les taux de mortalité liés au VIH pour 231 pays ou régions entre 1990 et 2017, soit 6468 observations. Chaque observation correspond à un couple (pays/année) avec les variables suivantes : Entity (pays ou région), Code (code ISO), Year (année) et Deaths (taux de décès pour 100 000 habitants, standardisé).
+
+Notre première exploration montre l’absence de valeurs manquantes dans le jeu de données (anyNA(vih) = FALSE) et une forte variabilité de la mortalité, avec des valeurs allant de 0 à plus de 1100 décès pour 100 000 habitants selon les pays et les années.
+
+```{r}
+summary(vih)
+anyNA(vih)
+```
+
+## 2.2 Sélection des pays et des régions :
+
+Pour illustrer les disparités géographiques, cinq pays ont été sélectionnés: France, Japon, Russie, États‑Unis et Afrique du Sud. Ces pays représentent des contextes épidémiologiques et socio‑économiques contrastés: faible mortalité au Japon, mortalité modérée en France et aux États‑Unis, situation plus critique en Russie et surtout en Afrique du Sud.
+
+Ensuite, quatre grandes régions ont été retenues pour une analyse plus globale, que nous traiterons ultérieurement : Afrique subsaharienne, Amérique du Nord, Amérique latine et Caraïbes, et l'ensemble «Europe centrale, Europe de l’Est et Asie centrale».
+
+## 2.3 Méthodes statistiques
+
+L’analyse a été réalisée avec R. Les principales étapes sont les suivantes :
+
+* Statistiques descriptives (résumés par pays, boxplots),
+
+* Vérification des hypothèses de normalité et d’homogénéité des variances (Q‑Q plots, tests de Shapiro‑Wilk, inspection visuelle des résidus),
+
+* Comparaison des distributions de mortalité entre pays par un test de Kruskal‑Wallis, en raison de la non‑normalité et de l’hétéroscédasticité,
+
+* Comparaisons multiples post‑hoc par le test de Games‑Howell pour identifier les paires de pays présentant des différences significatives,
+
+* Analyse de l’évolution temporelle de la mortalité:
+  - Par pays et par grandes régions à l’aide de courbes en échelle logarithmique.
+
+  - Au niveau mondial (entité World) via des modèles de régression linéaire, en particulier pour la période de déclin supposé (après le pic de mortalité).
+
+Le seuil de significativité retenu est $\alpha$ = 0,05.
+
+# 3. Résultats :
+
+### Création d'un tableau simple avec une colonne unique pour les noms, nous essayons d'abord de voir combien de pays sont présents au total :
+
+```{r}
+liste_pays <- as.data.frame(unique(vih$Entity))
+head(liste_pays)
+```
+```{r}
+tail(liste_pays)
+```
+
+
+### Q-Q Plot, vérification de la normalité globale :
+
+```{r}
+qqnorm(vih$Deaths, main='Anormal Q-Q Plot');qqline(vih$Deaths, col='red')
+```
+
+### Séparation des pays : South Africa, France, USA, Japon et Russie.
+
+```{r}
+mes_pays_vih <- c("South Africa", "France", "United States", "Japan", "Russia")
+
+# Création du dataframe vih_focus :
+
+vih_focus <- vih %>%
+  filter(Entity %in% mes_pays_vih)
+
+# Afficher les entités pour avoir confirmation :
+unique(vih_focus$Entity)
+```
+
+## 3.1 Statistiques descriptives et disparités entre pays
+
+### Tableau statistique :
+
+```{r}
+tableau <- vih_focus%>%
+  group_by(Entity)%>%
+  summarise (summary=list(summary(Deaths)))%>%
+  tidyr::unnest_wider(summary)
+knitr::kable(tableau, caption='Tableau récapitulatif', digits=2)
+```
+
+L’Afrique du Sud présente de très fortes valeurs, avec une moyenne d’environ 348 décès pour 100 000 habitants, alors que le Japon se situe autour de 0,13, la France vers 2,7, les États‑Unis autour de 5,7 et la Russie autour de 6,3.
+
+### Boxplots par pays :
+
+```{r}
+par(mar = c(8, 4, 4, 2))
+boxplot(Deaths~Entity, data=vih_focus, range=2, las=2,xlab="", ylab ="")
+```
+Ces boxplots sont illisibles, alors on va utiliser comme 'y' le log :
+-> réduction de l'effet des valeurs extrêmes d'Afrique du Sud.
+
+L’utilisation d’une échelle logarithmique pour la variable Deaths permet de réduire l’effet des valeurs extrêmes et d’obtenir une comparaison plus équilibrée des distributions entre pays. Les boxplots log‑transformés montrent clairement que la mortalité sud‑africaine reste nettement supérieure à celle des autres pays sur l’ensemble de la période.
+
+```{r}
+par(mar = c(8, 4, 4, 2))
+boxplot(Deaths~Entity, 
+        data=vih_focus,
+        log='y',
+        col=rainbow(5, alpha=0.6),
+        las=2,
+        range=2,
+        main="Distribution de la mortalité de VIH en fonction des pays (log)",
+        xlab="",
+        ylab="")
+```
+
+### Vérification de la présence d'outliers :
+
+```{r}
+val_max <- vih_focus %>%
+  group_by(Entity)%>%
+  identify_outliers(Deaths)
+knitr::kable(val_max, caption='Valeurs extrêmes', digits=2)
+```
+
+```{r}
+boxplot(Deaths ~ Entity, 
+        data = vih_focus,
+        main = "Distribution avec valeurs extrêmes",
+        log = 'y',
+        xlab = "Pays",
+        ylab = "Taux de décès",
+        col=rainbow(5, alpha=0.6),
+        outcol = "red",  # Couleur des outliers
+        outpch = 19)     # Forme des outliers
+
+```
+
+
+Dans le dataframe 'vih_focus', il y a la présence d'outliers :
+Certains pays ont souffert de l'épidémie encore plus que dans la moyenne (ou moins) de leur groupe.
+
+L’identification des valeurs extrêmes met en évidence des années particulières, des valeurs très faibles au Japon au début des années 1990 et des pics élevés en France et aux États‑Unis au milieu des années 1990. Ces observations suggèrent déjà des différences fortes de niveaux, de dynamiques et de contexte épidémique entre pays.
+
+## 3.2 Normalité, variances et comparaison des pays
+
+### Vérifier la normalité et l'égalité des variances :
+
+```{r}
+# Normalité : Les données de chaque groupe doivent être distribuées à peu près normalement.
+qqnorm(vih_focus$Deaths, pch=19, main='Distribution anormale des décès par le VIH');qqline(vih_focus$Deaths, col='red')
+```
+
+
+```{r}
+# Analyse des résidus ANOVA :
+modele1<- lm(Deaths~Entity, data=vih_focus)
+ggqqplot(residuals(modele1))
+```
+
+
+
+```{r}
+# Vérification de la normalité de chaque groupe séparément :
+ggqqplot(vih_focus, 'Deaths', facet.by='Entity', color='Entity')
+```
+
+
+Les résidus ANOVA semblent être normaux.
+
+
+
+```{r}
+# test Shapiro :
+shap <- shapiro.test(vih_focus$Deaths)
+print(shap)
+```
+
+```{r}
+# Vérifier la normalité de chaque groupe séparément :
+shapiro.test(vih_focus$Deaths[vih_focus$Entity == 'France'])
+shapiro.test(vih_focus$Deaths[vih_focus$Entity == 'Russia'])
+shapiro.test(vih_focus$Deaths[vih_focus$Entity == 'South Africa'])
+shapiro.test(vih_focus$Deaths[vih_focus$Entity == 'Japan'])
+shapiro.test(vih_focus$Deaths[vih_focus$Entity == 'United States'])
+
+```
+Pour tous, la p-value est < 0.05, on rejette H0 et la distribution n'est pas normale.
+
+Les tests de normalité appliqués aux données brutes de mortalité montrent que, pour l’ensemble des pays et pour chaque pays pris séparément, la distribution de Deaths s’écarte significativement de la loi normale (p < 0,05 pour tous les groupes).
+
+### Transformation des données (log(Deaths)) et revérifier la normalité et l'égalité des variances :
+
+```{r}
+vih_focus$log_Deaths <- log(vih_focus$Deaths)
+
+# Vérification de la présence d'outliers :
+val_max2 <- vih_focus %>%
+  group_by(Entity)%>%
+  identify_outliers(log_Deaths)
+knitr::kable(val_max2, caption='Valeurs extrêmes', digits=2)
+
+```
+```{r}
+boxplot(log_Deaths ~ Entity, 
+        data = vih_focus,
+        main = "Distribution avec valeurs extrêmes",
+        xlab = "Pays",
+        ylab = "Taux de décès",
+        col=rainbow(5, alpha=0.6),
+        outcol = "red",  # Couleur des outliers
+        outpch = 19)     # Forme des outliers
+```
+
+
+```{r}
+# Verfication de la normalité :
+qqnorm(vih_focus$log_Deaths, pch=19, main ="Distribution anormale (log)");qqline(vih_focus$log_Deaths, col="red")
+```
+
+```{r}
+par(mfrow=c(1,2))
+qqnorm(vih_focus$log_Deaths, pch=19, main= 'Distribution anormale (log)');qqline(vih_focus$log_Deaths, col="red")
+qqnorm(vih_focus$Deaths, pch=19, main='Distribution anormale');qqline(vih_focus$Deaths, col='red')
+```
+
+```{r}
+# Vérification de la normalité de chaque groupe séparément :
+ggqqplot(vih_focus, 'log_Deaths', facet.by='Entity', color='Entity')
+```
+Les résidus ANOVA semblent être normaux.
+
+
+```{r}
+shapiro.test(vih_focus$log_Deaths[vih_focus$Entity == 'France'])
+shapiro.test(vih_focus$log_Deaths[vih_focus$Entity == 'Russia'])
+shapiro.test(vih_focus$log_Deaths[vih_focus$Entity == 'South Africa'])
+shapiro.test(vih_focus$log_Deaths[vih_focus$Entity == 'Japan'])
+shapiro.test(vih_focus$log_Deaths[vih_focus$Entity == 'United States'])
+
+```
+
+D'après le test Shapiro, seule la Russie suit la loi de normalité.
+La transformation logarithmique améliore partiellement la situation, mais plusieurs pays (France, Japon, Afrique du Sud, États‑Unis) présentent encore des distributions log‑transformées non normales selon le test de Shapiro.
+
+
+
+```{r}
+modele_1 <- lm(log_Deaths ~ Year, data = vih_focus)
+
+# Extraire les résidus
+residus_modele_1 <- residuals(modele_1)
+
+# 1. Vérification Visuelle (QQ-Plot, la meilleure méthode)
+ggqqplot(residus_modele_1)
+```
+
+```{r}
+shapiro.test(residuals(modele_1))
+```
+
+```{r}
+plot(modele_1, 1)
+```
+
+Étant donné que les distributions ne suivent pas de loi normale et que les variances sont inégales, nous utiliserons le test non-paramétrique de Kruskal-Wallis.
+
+```{r}
+kruskal.test(log_Deaths~Entity, data=vih_focus)
+```
+p-value < 0.05 : On rejette H0. Différence significative entre nos distributions.
+
+Comme les variances sont inégales, nous ne pouvons pas faire le test de Tukey. Il nous aurait permis de savoir qui est différent de qui, notamment en comparant toutes les paires possibles. 
+Nous allons donc faire le test de Games-Howell.
+
+```{r}
+games <- games_howell_test(vih_focus, log_Deaths~Entity)
+games
+```
+
+Attention l'ordre est groupe2 - groupe1.
+-> (+) = groupe2 supérieur et (-) = groupe1 supérieur.
+
+Donc : 
+
+* Le Japon a un plus faible taux de mortalité comparé à la France.
+* La Russie a un plus fort taux de mortalité comparé à la France.
+* L'Afrique du Sud a un plus fort taux de mortalité comparé à la France.
+* Les États-Unis ont un plus fort taux de mortalité comparé à la France.
+* La Russie a un plus fort taux de mortalité comparé au Japon.
+* L'Afrique du Sud a un plus fort taux de mortalité comparé au Japon (une différence énorme).
+* Les États-Unis ont un plus fort taux de mortalité comparé au Japon.
+* L'Afrique du Sud a un plus fort taux de mortalité comparé à la Russie.
+* Les États-Unis ont un plus faible taux de mortalité que la Russie (à peu près égale).
+* Les États-Unis ont un plus faible taux de mortalité que l'Afrique du Sud.
+
+En résumé :
+
+* Une mortalité significativement plus faible au Japon par rapport à tous les autres pays.
+
+* Une mortalité significativement plus élevée en Afrique du Sud par rapport à tous les autres pays, avec une différence particulièrement marquée vis‑à‑vis du Japon.
+
+* Une mortalité légèrement plus élevée en Russie qu’aux États‑Unis, mais cette différence n’est pas significative (p environ 0,70).
+
+```{r}
+# Classement de la mortalité liée au VIH dans vih_focus :
+classement <- vih_focus%>%
+  group_by(Entity)%>%
+  summarise (
+    Moyenne_log = mean(log_Deaths, na.rm=TRUE),
+    Moyenne_reelle = mean(Deaths, na.rm=TRUE)
+  )%>%
+  arrange(desc(Moyenne_log))
+knitr::kable(classement, caption = "Classement de la mortalité", digits =2)
+```
+
+De 1990 à 2017, le pays ayant eu le plus de morts touchés par le VIH est l'Afrique du Sud.
+
+```{r}
+barplot(height = classement$Moyenne_log,
+        names.arg = classement$Entity,
+        las = 2,  # Rotation des noms à 90°
+        col = rainbow(10, alpha=0.6),
+        main = "Classement de la mortalité",
+        ylab = "Taux de décès moyen (pour 100k habitants)",
+        cex.names = 0.8)  # Taille des noms
+```
+
+
+
+```{r}
+# Classement des pays les plus touchés par le VIH dans vih :
+classement_2 <- vih%>%
+  group_by(Entity)%>%
+  summarise (
+    Moyenne_mortalité = mean(Deaths, na.rm=TRUE)
+  )%>%
+  arrange(desc(Moyenne_mortalité))%>%
+  slice(1:10)
+knitr::kable(classement_2, caption = "Classement des pays les plus touchés par le VIH", digits =2)
+
+
+```
+
+
+```{r}
+par(mar = c(8, 4, 4, 2))
+barplot(height = classement_2$Moyenne_mortalité,
+        names.arg = classement_2$Entity,
+        las = 2,  # Rotation des noms à 90°
+        col = rainbow(10, alpha=0.6),
+        main = "Top 10 des pays les plus touchés par le VIH",
+        ylab = "Taux de décès moyen (pour 100k habitants)",
+        cex.names = 0.8)  # Taille des noms
+```
+
+
+
+
+## 3.3 Évolution temporelle par pays et par région
+
+### Évolution temporelle de la mortalité liée au VIH entre 1990 et 2017 :
+
+```{r}
+# Créer un sous-ensemble avec la dernière année pour le positionnement des labels
+derniere_annee <- vih_focus %>%
+  filter(Year == max(Year))
+
+ggplot(vih_focus, aes(x = Year, y = Deaths, color = Entity)) +
+  geom_line(aes(linetype = Entity), linewidth = 0.8) +
+  scale_y_log10() +
+  geom_text_repel(data = derniere_annee,
+                  aes(label = Entity),
+                  nudge_x = 1,
+                  direction = "y",
+                  hjust = 0,
+                  segment.size = 0.2) +
+  labs(
+    title = "Évolution de la mortalité du VIH par pays (1990-2017)",
+    x = 'Année',
+    y = 'Taux de décès (pour 100k habitants)'
+  ) + 
+   coord_cartesian(clip = "off", xlim = c(1990, 2022)) +
+  
+  theme_minimal() +
+  theme(
+    legend.position = "none",  # SUPPRIMER LA LÉGENDE
+    plot.margin = margin(10, 80, 10, 10)  # Marge droite pour les labels
+  )
+```
+Les courbes d’évolution de la mortalité par pays, tracées en échelle logarithmique, montrent des dynamiques temporelles contrastées. L’Afrique du Sud présente une forte augmentation de la mortalité dans les années 1990 et au début des années 2000, suivie d’un déclin progressif après le milieu des années 2000. La Russie et les États‑Unis présentent des profils avec un pic intermédiaire puis une baisse, tandis que la France montre une mortalité globalement plus faible avec un maximum au milieu des années 1990. Le Japon reste à des niveaux très bas sur toute la période.
+
+### Histogramme/Graphique : Comparer les taux de mortalité moyens par contient ou grande région (Central Europe, Eastern Europe, and Central Asia), (Latin America and Caribbean), North America, Sub-Saharan Africa.
+
+```{r}
+mes_regions <- c("Sub-Saharan Africa", "North America", "Central Europe, Eastern Europe, and Central Asia", "Latin America and Caribbean")
+
+vih_regions <- vih%>%
+  filter(Entity %in% mes_regions)
+
+# Créer un sous-ensemble avec la dernière année pour le positionnement des labels
+derniere_annee2 <- vih_regions %>%
+  filter(Year == max(Year))
+
+ggplot(vih_regions, aes(x=Year, y=Deaths, color=Entity))+
+geom_line(aes(linetype=Entity), linewidth=0.8)+
+geom_text_repel(data = derniere_annee2,
+                  aes(label = Entity),
+                  nudge_x = 1,
+                  direction = "y",
+                  hjust = 0,
+                  segment.size = 0.2) +
+scale_y_log10()+
+labs(
+  title = "Évolution de la mortalité du VIH par régions (1990-2017)",
+  x='année',
+  y='taux de décès (pour 100k habitants)'
+) +
+  
+  # Étendre l'axe X pour laisser de la place aux labels
+  coord_cartesian(clip = "off", xlim = c(1990, 2022)) +
+  
+  theme_minimal() +
+  theme(
+    legend.position = "none",  # SUPPRIMER LA LÉGENDE
+    plot.margin = margin(10, 80, 10, 10)  # Marge droite pour les labels
+  )
+```
+À l’échelle régionale, l’Afrique subsaharienne se distingue par des taux de mortalité largement supérieurs à ceux des autres régions, avec une montée marquée dans les années 1990 puis un déclin après le milieu des années 2005. L’Amérique du Nord et l’Amérique latine et Caraïbes présentent des mortalités plus modérées avec un pic plus précoce, tandis que la région «Europe centrale, Europe de l’Est et Asie centrale» montre une dynamique intermédiaire. Ces résultats illustrent des disparités régionales majeures dans l’impact de l’épidémie de VIH.
+
+## 3.4 Analyse de la tendance mondiale
+
+### Test de rupture (avant/après) avec division en 2 périodes : 1990-2005 (montée) et 2006-2017(déclin 'supposé')
+### Existe-t-il une différence de moyenne significative de mortalité entre la montée et le déclin supposé ?
+
+Afin d’étudier la tendance mondiale, l’entité World a été isolée et la série temporelle 1990‑2017 a été divisée en deux période : 1990‑2005 (montée) et 2006‑2017 (déclin supposé).
+
+```{r}
+# Création de la colonne 'Période' :
+vih_rupture <- vih%>%
+  filter(Entity == 'World')%>% # Tendance mondiale ('World')
+mutate (Periode= ifelse ( Year<=2005, "1990-2005 (Montée)", "2006-2017 (Déclin supposé)"))
+table(vih_rupture$Periode)
+```
+
+Un boxplot comparant la mortalité moyenne mondiale entre ces deux périodes ne met pas en évidence de différence visuelle très nette. Les médianes sont égales.
+
+```{r}
+boxplot(Deaths~Periode, 
+        data=vih_rupture, 
+        range=2, 
+        col=rainbow(2), 
+        main= "Comparaison de la mortalité mondiale : Avant vs Après 2005"
+        )
+```
+
+
+Pour voir si les moyennes de mortalité sont significatives, nous allons devoir réaliser des tests et pour cela nous allons devoir vérifier les hypothèses de validité du modèle.
+
+```{r}
+# Normalité :
+vih_rupture%>%
+  group_by(Periode)%>%
+  shapiro_test(Deaths)
+```
+
+
+```{r}
+qqnorm(vih_rupture$Deaths, pch=19);qqline(vih_rupture$Deaths, col="red")
+```
+Le test de normalité de Shapiro‑Wilk et la courbe de normalité pour chaque période ne rejette pas l’hypothèse de normalité, permettant l’utilisation de tests paramétriques pour comparer les moyennes.
+
+Normalité validée.
+
+```{r}
+vih_montee <- vih %>%
+  filter(Entity == "World" & Year <= 2006)
+# Lancer le modèle
+modele_montee <- lm(Deaths ~ Year, data = vih_montee)
+
+# Extraire les résidus
+residus_modele2 <- residuals(modele_montee)
+
+# 1. Vérification Visuelle (QQ-Plot)
+ggqqplot(residus_modele2, main='Plot de la montée du VIH')
+
+
+```
+
+```{r}
+# 2. Test Statistique (Shapiro-Wilk)
+shapiro.test(residus_modele2)
+```
+```{r}
+vih_declin <- vih %>%
+  filter(Entity == "World" & Year >= 2006)
+# Lancer le modèle
+modele_declin <- lm(Deaths ~ Year, data = vih_declin)
+
+# Extraire les résidus
+residus_modele <- residuals(modele_declin)
+
+# 1. Vérification Visuelle (QQ-Plot, la meilleure méthode)
+ggqqplot(residus_modele, main='Plot du déclin supposé du VIH')
+
+
+```
+
+```{r}
+# 2. Test Statistique (Shapiro-Wilk)
+shapiro.test(residus_modele)
+```
+```{r}
+# Égalité des variances
+par(mfrow=c(1,2))
+plot(modele_montee,1, main='Modèle de la montée du VIH')
+plot(modele_declin,1, main='Modèle du déclin du VIH')
+```
+
+Les variances sont inégales. Alors test de Welch (car variables normales mais variances inégales) :
+
+```{r}
+t.test(Deaths~Periode, data=vih_rupture)
+```
+
+H0 : les moyennes sont égales (hypothèse nulle)
+H1 : les moyennes ne sont pas égales (hypothèse alternative)
+
+Ici, on ne rejette pas H0 (p-value > 0.05). Les données ne fournissent pas de preuves suffisantes pour dire que les moyennes sont différentes.
+
+
+### Comment prouver que la mortalité du VIH baisse ?
+
+```{r}
+summary(modele_declin)
+```
+
+Estimate (pente) : C'est négatif (-1.611), cela veut dire qu'en moyenne, la mortalité baisse de 1.611 point par an.
+p-value < 0.05, cette pente descendante n'est pas due au hasard.
+
+Le modèle de régression linéaire ajusté sur la période de déclin (2006‑2017) met en évidence une pente négative significative (Estimate = -1,611, p < 0,001), indiquant une baisse moyenne de 1,61 décès pour 100 000 habitants par an au niveau mondial. Le coefficient de détermination est très élevé (R² ajusté environ 0,99), ce qui montre que le modèle rend bien compte de la tendance décroissante sur cette période. On peut donc conclure que, malgré l’absence de différence significative de moyenne entre périodes larges, la mortalité liée au VIH diminue de manière régulière depuis le milieu des années 2000 au niveau mondial (mais pas assez rapidement)
+
+# 4. Discussion :
+
+Les résultats mettent en évidence des disparités géographiques majeures dans la mortalité liée au VIH entre 1990 et 2017. L’Afrique du Sud et, plus largement, l’Afrique subsaharienne présentent des niveaux de mortalité très supérieurs à ceux des pays à revenus élevés comme la France, le Japon ou les États‑Unis. Ces différences reflètent à la fois des prévalences beaucoup plus élevées, un accès plus tardif et moins équitable aux traitements antirétroviraux, et des systèmes de santé soumis à des contraintes structurelles importantes.
+
+La baisse significative de la mortalité mondiale à partir du milieu des années 2000 suggère un impact réel des interventions de santé publique, notamment la généralisation des thérapies antirétrovirales, le renforcement des programmes de dépistage et la mise en œuvre de stratégies «Test and Treat». Toutefois, la persistance de niveaux très élevés dans certaines régions rappelle que les bénéfices de ces progrès restent inégalement répartis.
+
+
+
+# 5. Conclusion :
+
+Entre 1990 et 2017, la mortalité liée au VIH a suivi une dynamique caractérisée par une montée marquée jusqu’au début des années 2000, suivie d’une baisse régulière au niveau mondial, avec une diminution moyenne d’environ 1,6 décès pour 100 000 habitants par an sur la période de déclin. Malgré cette amélioration globale, les inégalités entre pays et régions restent très importantes, l’Afrique du Sud et l’Afrique subsaharienne restant les plus fortement touchées.
+
+Ces résultats illustrent à la fois l’efficacité des réponses de santé publique mises en place depuis le milieu des années 1990 et la nécessité de poursuivre les efforts pour réduire les disparités géographiques dans l’accès à la prévention, au dépistage et au traitement du VIH.
