@@ -1,5 +1,0 @@
-Greffes d’organes
-L'objectif de l'étude est de déterminer si le nombre de jours pendant lesquels un patient a survécu était
-influencé par l'organe affecté.
-- variable dépendante : survie mesurée en jours
-- variable indépendante : les différents organes (estomac, côlon, ovaires, poumons, seins)
