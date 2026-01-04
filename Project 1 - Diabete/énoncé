@@ -1,0 +1,19 @@
+Glycémie de patients diabétiques soumis à 2 régimes alimentaires différents :
+
+Une nutritionniste souhaite comparer deux régimes différents, A et B, pour des patients diabétiques.
+Dans une population de patients diabétiques, elle a échantillonné aléatoirement 100 patients qui suivront le
+régime A (groupe1) et 100 patients qui suivront le régime B (groupe2). A la fin de l'expérience, qui dure 6
+semaines, un test de glycémie à jeun est réalisé sur chaque patient.
+(1) Description des données
+- Quelle est la glycémie moyenne de chaque groupe ?
+- Quel est l’écart-type de la distribution de la glycémie pour le régime A et pour le régime B ?
+- Représenter la distribution de la glycémie de chaque régime sous la forme d’un graphique permettant
+de visualiser la médiane et les quartiles.
+(2) Analyses statistiques
+- Quelle est la différence moyenne de glycémie entre les deux régimes ?
+- Cette différence est-elle significative ?
+(3) Taille de l’échantillon
+- Echantillonner aléatoirement 10 patients de chaque groupe (groupe1b et groupe2b).
+- Répéter les questions des parties (1) et (2) pour ces sous-échantillons.
+- Que remarquez-vous en comparant les résultats obtenus pour des groupes de 100 ou 10 patients?
+
