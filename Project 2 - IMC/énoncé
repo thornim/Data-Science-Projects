@@ -1,0 +1,11 @@
+Calcul d’IMC de patients diabétques et non-diabétiques : 
+
+1) Créer une fonction permettant de calculer l’imc
+IMC = Poids (kilos) / Taille*Taille (en mètres)
+2) Calculer l’imc de chaque patient
+3) Quel est le coefficient de corrélation entre le poids et la taille ? Cette corrélation est-elle
+significative?
+4) Représenter sur le même graphique la relation entre le poids et la taille pour chaque groupe de
+patients (diabétiques, non-diabétiques)
+5) Représenter côte à côte les distributions (histogrammes) de l’imc pour chaque groupe de patients.
+6) La différence d’imc entre les groupes est-elle significative?
