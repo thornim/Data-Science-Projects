@@ -1,0 +1,159 @@
+---
+title: "Rapport_IMC"
+author: "tasnim"
+date: "2025-10-16"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Mini-Projet (2) - Calcul d'IMC de patients diabétiques et non-diabétiques
+====================
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+
+```{r cars}
+
+setwd("/Users/tasnim/Desktop/M1-InfoMed/Mini-projets(R)/(2)")
+tab <-read.csv("imc.csv",header=TRUE,sep=";")
+
+```
+
+## 1) Créer une fonction permettant de calculer l'imc
+```{r}
+calcul_IMC <- function (poids,taille)
+{y <-poids/(taille*taille)
+return (y)
+}
+```
+Cette fonction va nous permettre de calculer les IMCs des différents patients sans avoir à réiterer les mêmes commandes.
+
+## 2) Calculer l'IMC de chaque patient
+```{r}
+tab$IMC <- mapply(calcul_IMC,tab$poids,tab$taille)
+head(tab$IMC)
+tail(tab$IMC)
+
+
+```
+
+```{r}
+diabétique <- subset(tab, tab$diabete =="oui")
+non_diabétique <- subset(tab, tab$diabete =="non")
+```
+
+
+```{r}
+# Résumé statistique de l'IMC par groupe (diabétique et non-diabétique)
+by(tab$IMC,tab$diabete,summary)
+```
+
+
+
+
+
+
+
+## 3) Coefficient de corrélation entre poids et taille ?
+```{r}
+cor(tab$poids,tab$taille,use="complete.obs")
+cor.test(tab$taille,tab$poids)
+```
+
+
+Le coefficient de corrélation vaut 0.23. Nous pouvons dire que cette corrélation est significative car la p-valeur valant 0.0009447 est inférieure à la valeur seuil estimée à 0.05.
+
+
+
+```{r}
+tab$statut <- ifelse(tab$diabete == "oui", "diabétique", "non_diabétique")
+
+```
+
+
+
+
+## 4) Représenter sur le même graphique la relation entre le poids et la taille pour chaque groupe de patients (diabétiques, non-diabétiques)
+
+
+```{r}
+# Couleur selon le statut diabète (orange pour diabétique, green pour non-diabétique)
+couleur <- ifelse(tab$diabete == "oui", "orange", "green")
+
+# Nuage de points
+plot(tab$taille, tab$poids, col = couleur, pch = 19, xlab="taille en m", ylab="poids en kg", main="")
+
+# Légende
+legend("topleft", pch = 19, col = c("orange","green"),
+legend = c("diabétiques", "non-diabétiques"), bty = "n")
+
+```
+
+
+## 5) Représenter côte à côte les distributions (histogrammes) de l’imc pour chaque groupe de patients. 
+
+```{r}
+
+# Séparer les IMC selon le groupe
+imc_diabétique <- tab$IMC[tab$diabete == "oui"]
+imc_nondiabétique <- tab$IMC[tab$diabete == "non"]
+
+
+# Afficher deux histogrammes côte à côte
+par(mfrow = c(1, 2))
+hist(imc_diabétique, col = "orange", main = "Diabétiques", xlab = "IMC",freq=FALSE)
+lines(density(imc_diabétique, na.rm = TRUE), lwd = 2, col = "red")
+hist(imc_nondiabétique, col = "green", main = "Non-diabétiques", xlab = "IMC",freq=FALSE)
+lines(density(imc_nondiabétique, na.rm = TRUE), lwd = 2, col = "red")
+
+
+```
+
+## 6) La différence d’imc entre les groupes est-elle significative?
+
++ ***Test de normalité :***
+
+```{r}
+shapiro.test(imc_diabétique)
+```
+```{r}
+shapiro.test(imc_nondiabétique)
+```
+```{r}
+par(mfrow=c(1,2))
+qqnorm(imc_diabétique,col="orange",main="Diabétiques");qqline(imc_diabétique)
+qqnorm(imc_nondiabétique,col="green",main="Non-diabétiques");qqline(imc_nondiabétique)
+```
+Les IMCs suivent une loi normale.
+
+
++ ***Égalité des variances :***
+```{r}
+var.test(imc_diabétique,imc_nondiabétique)
+```
+Les variances des IMCs sont égales.
+
+
+
+
+
++ ***Test t Student :***
+Les variables suivent une loi normale, les variances sont égales et l'effectif est supérieur à 30. Les conditions sont remplies pour pouvoir réaliser le test t Student.
+
+
+```{r}
+t.test(imc_diabétique,imc_nondiabétique)
+```
+La différence d'IMC entre les groupes (diabtéiques et non-diabétiques) est significative. La 'p-value' < 2.2e-16 et donc inférieure à 0.05 (valeur seuil).
+
+
+
+
+
